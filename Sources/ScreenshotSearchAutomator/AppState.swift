@@ -6,7 +6,7 @@ import Foundation
 final class AppState {
     private let hotKeyCenter = HotKeyCenter()
     private let captureService = CaptureService()
-    private let apiClient = APIClient(configuration: .load())
+    private let apiClient = APIClient(provider: AppConfiguration.load().makeProvider())
 
     private var selectionOverlay: SelectionOverlayController?
     private var promptPanel: FloatingPanelController?

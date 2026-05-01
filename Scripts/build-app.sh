@@ -86,14 +86,12 @@ cat > "$CONTENTS_DIR/Info.plist" <<EOF
 </plist>
 EOF
 
-if [[ -n "${SCREENSHOT_SEARCH_API_URL:-}" ]]; then
+if [[ -n "${AI_API_KEY:-}" && -n "${AI_PROVIDER:-}" ]]; then
     cat > "$RESOURCES_DIR/RuntimeConfig.json" <<EOF
 {
-  "apiURL": "${SCREENSHOT_SEARCH_API_URL}",
-  "apiKey": "${SCREENSHOT_SEARCH_API_KEY:-}",
-  "model": "${SCREENSHOT_SEARCH_API_MODEL:-}",
-  "apiKeyHeader": "${SCREENSHOT_SEARCH_API_KEY_HEADER:-Authorization}",
-  "apiKeyPrefix": "${SCREENSHOT_SEARCH_API_KEY_PREFIX:-Bearer }"
+  "provider": "${AI_PROVIDER}",
+  "apiKey": "${AI_API_KEY}",
+  "model": "${AI_MODEL:-}"
 }
 EOF
 fi

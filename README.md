@@ -1,6 +1,6 @@
 # Screenshot Search Automator
 
-This is a no-Xcode starter for a macOS app that lets you:
+MacOS app that lets you:
 
 1. Trigger a global hotkey.
 2. Drag to select a screen area.
@@ -18,7 +18,7 @@ The project uses SwiftPM for builds and a small shell script to assemble a signe
 - Screen capture via ScreenCaptureKit for the chosen rectangle
 - Floating prompt panel under the selected area
 - Floating response panel that replaces the prompt panel
-- URLSession-based API client with a flexible JSON parser
+- Native Claude (Anthropic) and OpenAI API clients with vision support
 - Manual `.app` bundle build and ad-hoc signing
 
 ## What still needs product work
@@ -26,7 +26,6 @@ The project uses SwiftPM for builds and a small shell script to assemble a signe
 - Custom hotkey configuration UI
 - Better cancellation and escape handling polish
 - Rich response rendering and copy actions
-- A finalized request/response contract for your exact AI API
 - Hardened TCC permission and error messaging flows
 
 ## Requirements
@@ -37,67 +36,96 @@ The project uses SwiftPM for builds and a small shell script to assemble a signe
 
 ## Build and run
 
-Debug build:
+Debug build (no API baked in):
 
 ```bash
 swift build
 ```
 
-Build a runnable `.app` bundle:
+Build a runnable `.app` bundle with your API key embedded:
 
 ```bash
+AI_PROVIDER="claude" \
+AI_API_KEY="sk-ant-..." \
 ./Scripts/build-app.sh
 ```
 
-Build and run the app from the bundle executable:
+Build and immediately launch:
 
 ```bash
-SCREENSHOT_SEARCH_API_URL="https://your-api.example/v1/ask" \
-SCREENSHOT_SEARCH_API_KEY="replace-me" \
+AI_PROVIDER="claude" \
+AI_API_KEY="sk-ant-..." \
 ./Scripts/build-app.sh --run
 ```
 
-The build script writes `RuntimeConfig.json` into the app bundle when those environment variables are present. That avoids depending on Finder-launched environment variables.
+Use `--release` for an optimised binary:
+
+```bash
+AI_PROVIDER="claude" \
+AI_API_KEY="sk-ant-..." \
+./Scripts/build-app.sh --release --run
+```
 
 ## Runtime configuration
 
-The app reads API configuration in this order:
+The app reads configuration in this priority order:
 
-1. Environment variables at launch time
+1. Environment variables set at launch time
 2. `RuntimeConfig.json` embedded in the app bundle by `build-app.sh`
 
-Supported variables:
+### Environment variables
 
-- `SCREENSHOT_SEARCH_API_URL`
-- `SCREENSHOT_SEARCH_API_KEY`
-- `SCREENSHOT_SEARCH_API_MODEL`
-- `SCREENSHOT_SEARCH_API_KEY_HEADER` (defaults to `Authorization`)
-- `SCREENSHOT_SEARCH_API_KEY_PREFIX` (defaults to `Bearer`)
+| Variable | Required | Description |
+|---|---|---|
+| `AI_PROVIDER` | Yes | `claude` or `openai` |
+| `AI_API_KEY` | Yes | Your API key |
+| `AI_MODEL` | No | Model name override (see defaults below) |
 
-## API payload shape
+### Default models
 
-The starter client sends JSON in this form:
+| Provider | Default model |
+|---|---|
+| `claude` | `claude-sonnet-4-5` |
+| `openai` | `gpt-4o-mini` |
 
-```json
-{
-  "question": "What is happening in this screenshot?",
-  "imageBase64": "...",
-  "mimeType": "image/png",
-  "model": "optional-model-name"
-}
+### Switching provider
+
+```bash
+# Claude
+AI_PROVIDER="claude" AI_API_KEY="sk-ant-..." ./Scripts/build-app.sh --run
+
+# OpenAI
+AI_PROVIDER="openai" AI_API_KEY="sk-..." ./Scripts/build-app.sh --run
+
+# Override model
+AI_PROVIDER="claude" AI_API_KEY="sk-ant-..." AI_MODEL="claude-sonnet-4-6" ./Scripts/build-app.sh --run
 ```
 
-The response parser accepts several common response shapes:
+## API integration
 
-- `{ "answer": "..." }`
-- `{ "content": "..." }`
-- OpenAI-style `choices[0].message.content`
-- Plain text responses
+### Claude
 
-If your API differs, update `makeRequestBody` and `extractAnswer` in `Sources/ScreenshotSearchAutomator/APIClient.swift`.
+Uses the [Anthropic Messages API](https://docs.anthropic.com/en/api/messages) with a vision message. The image is sent as a base64-encoded PNG alongside your question.
+
+Required headers set automatically:
+
+- `x-api-key: <your key>`
+- `anthropic-version: 2023-06-01`
+
+### OpenAI
+
+Uses the [Chat Completions API](https://platform.openai.com/docs/api-reference/chat) with a vision message (`image_url` content block, `data:image/png;base64,...` format).
+
+Required headers set automatically:
+
+- `Authorization: Bearer <your key>`
+
+### Privacy
+
+Both integrations include a system prompt that instructs the model to answer only what was asked and not describe or summarise other contents of the screenshot.
 
 ## Permissions
 
-The first capture attempt will require Screen Recording permission. After granting it in System Settings, relaunch the built app bundle so the permission attaches to a stable app identity.
+The first capture attempt requires Screen Recording permission. After granting it in System Settings, relaunch the built app bundle so the permission attaches to a stable app identity.
 
-If you previously denied the permission, the app now shows a recovery panel with a direct link to the Screen Recording settings pane. macOS will continue blocking capture until that permission is enabled and the app is restarted.
+If permission was previously denied, the app shows a recovery panel with a direct link to the Screen Recording settings pane. macOS will continue blocking capture until the permission is enabled and the app is restarted.
