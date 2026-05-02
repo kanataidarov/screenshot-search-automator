@@ -7,6 +7,8 @@ enum APIProvider {
     case claudeMessages(apiKey: String, model: String)
     /// OpenAI Chat Completions (gpt-4o etc.,  https://api.openai.com)
     case openAI(apiKey: String, model: String)
+    /// Google Gemini generateContent API  (https://generativelanguage.googleapis.com)
+    case gemini(apiKey: String, model: String)
 }
 
 // MARK: - Client
@@ -18,8 +20,9 @@ struct APIClient {
     private static let claudeAPIVersion  = "2023-06-01"
     private static let openAIEndpoint    = URL(string: "https://api.openai.com/v1/chat/completions")!
 
-    static let defaultClaudeModel = "claude-sonnet-4-5"
-    static let defaultOpenAIModel = "gpt-4o-mini"
+    static let defaultClaudeModel  = "claude-sonnet-4-5"
+    static let defaultOpenAIModel  = "gpt-4o-mini"
+    static let defaultGeminiModel  = "gemini-2.5-flash"
 
     // Instructs the model to answer only what was asked and not volunteer
     // unrelated details from the screenshot (protects user privacy).
@@ -35,7 +38,7 @@ struct APIClient {
         guard let provider else {
             throw APIError.missingConfiguration(
                 "No AI API configured.\n" +
-                "Set AI_PROVIDER (claude or openai) and AI_API_KEY, " +
+                "Set AI_PROVIDER (claude, openai, or gemini) and AI_API_KEY, " +
                 "and optionally AI_MODEL.\n" +
                 "Pass them to the build script to embed them in the app bundle."
             )
@@ -46,6 +49,9 @@ struct APIClient {
                                         apiKey: key, model: model)
         case .openAI(let key, let model):
             return try await sendOpenAI(question: question, imageData: imageData,
+                                        apiKey: key, model: model)
+        case .gemini(let key, let model):
+            return try await sendGemini(question: question, imageData: imageData,
                                         apiKey: key, model: model)
         }
     }
@@ -136,6 +142,53 @@ struct APIClient {
         }
     }
 
+    // MARK: Gemini generateContent API
+
+    private func sendGemini(question: String, imageData: Data,
+                             apiKey: String, model: String) async throws -> String {
+        guard let endpoint = URL(string:
+            "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)"
+        ) else {
+            throw APIError.transport("Could not construct Gemini endpoint URL.")
+        }
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "systemInstruction": [
+                "parts": [["text": Self.systemPrompt]]
+            ],
+            "contents": [
+                [
+                    "role": "user",
+                    "parts": [
+                        [
+                            "inline_data": [
+                                "mime_type": "image/png",
+                                "data":      imageData.base64EncodedString()
+                            ]
+                        ],
+                        ["text": question]
+                    ]
+                ]
+            ],
+            "generationConfig": ["maxOutputTokens": 1024]
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return try await performRequest(request) { data in
+            guard let root       = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let candidates = root["candidates"] as? [[String: Any]],
+                  let content    = candidates.first?["content"] as? [String: Any],
+                  let parts      = content["parts"] as? [[String: Any]] else {
+                throw APIError.transport("Unexpected Gemini response structure.")
+            }
+            let text = parts.compactMap { $0["text"] as? String }.joined(separator: "\n")
+            if text.isEmpty { throw APIError.transport("Gemini returned no text.") }
+            return text
+        }
+    }
+
     // MARK: Shared transport
 
     private func performRequest(_ request: URLRequest,
@@ -183,6 +236,8 @@ struct AppConfiguration: Decodable {
             return .claudeMessages(apiKey: key, model: resolvedModel ?? APIClient.defaultClaudeModel)
         case "openai":
             return .openAI(apiKey: key, model: resolvedModel ?? APIClient.defaultOpenAIModel)
+        case "gemini":
+            return .gemini(apiKey: key, model: resolvedModel ?? APIClient.defaultGeminiModel)
         default:
             return nil
         }
