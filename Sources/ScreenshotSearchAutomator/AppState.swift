@@ -134,9 +134,14 @@ final class AppState {
     private func showPrompt(for selection: CapturedSelection) {
         dismissFloatingPanels()
 
-        let panel = FloatingPanelController(size: NSSize(width: 460, height: 150))
+        let prompts = PromptStore.shared.prompts
+        let hasQuickPrompts = prompts.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let panelHeight: CGFloat = hasQuickPrompts ? 195 : 160
+
+        let panel = FloatingPanelController(size: NSSize(width: 460, height: panelHeight))
         panel.show(relativeTo: selection.rect, on: selection.screen) {
             QuestionPromptView(
+                prompts: prompts,
                 onSubmit: { [weak self] question in
                     self?.submitQuestion(question)
                 },

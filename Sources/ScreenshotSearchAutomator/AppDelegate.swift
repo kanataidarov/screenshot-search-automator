@@ -4,6 +4,7 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var appState: AppState?
     private var statusItem: NSStatusItem?
+    private let quickPromptsSettings = QuickPromptsSettingsController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -24,6 +25,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc
+    private func openQuickPromptsSettings() {
+        quickPromptsSettings.show()
+    }
+
+    @objc
     private func beginCaptureFlow() {
         appState?.beginCaptureFlow()
     }
@@ -39,6 +45,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusItem.button?.title = "Shot"
         menu.addItem(NSMenuItem(title: "Capture", action: #selector(beginCaptureFlow), keyEquivalent: ""))
+        menu.addItem(.separator())
+        menu.addItem(NSMenuItem(title: "Quick Prompts...", action: #selector(openQuickPromptsSettings), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quitApplication), keyEquivalent: "q"))
 

@@ -72,17 +72,42 @@ private final class FloatingPanelWindow: NSPanel {
 }
 
 struct QuestionPromptView: View {
+    let prompts: [String]
     let onSubmit: (String) -> Void
     let onCancel: () -> Void
 
     @State private var question = ""
     @FocusState private var isFocused: Bool
 
+    private var activePrompts: [(index: Int, text: String)] {
+        prompts.enumerated()
+            .filter { !$0.element.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .map { (index: $0.offset, text: $0.element) }
+    }
+
     var body: some View {
         PanelCard {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Ask about this screenshot")
-                    .font(.headline)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .center) {
+                    Text("Ask about this screenshot")
+                        .font(.headline)
+                    Spacer()
+                    if !activePrompts.isEmpty {
+                        HStack(spacing: 5) {
+                            ForEach(activePrompts, id: \.index) { item in
+                                Button {
+                                    onSubmit(item.text)
+                                } label: {
+                                    Text("\(item.index + 1)")
+                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                        .frame(width: 26, height: 26)
+                                }
+                                .buttonStyle(.bordered)
+                                .help(item.text)
+                            }
+                        }
+                    }
+                }
 
                 TextField("What should the AI look at here?", text: $question, axis: .vertical)
                     .textFieldStyle(.roundedBorder)
