@@ -94,12 +94,12 @@ struct QuestionPromptView: View {
                     Spacer()
                     if !activePrompts.isEmpty {
                         HStack(spacing: 5) {
-                            ForEach(activePrompts, id: \.index) { item in
+                            ForEach(activePrompts.reversed(), id: \.index) { item in
                                 Button {
                                     onSubmit(item.text)
                                 } label: {
                                     Text("\(item.index + 1)")
-                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                        .font(.system(size: 14, weight: .bold, design: .rounded))
                                         .frame(width: 26, height: 26)
                                 }
                                 .buttonStyle(.bordered)
@@ -117,8 +117,11 @@ struct QuestionPromptView: View {
                 HStack {
                     Button("Cancel", action: onCancel)
                     Spacer()
-                    Button("Send") {
+                    Button {
                         onSubmit(question.trimmed)
+                    } label: {
+                        Text("Send")
+                            .frame(minWidth: 90)
                     }
                     .keyboardShortcut(.defaultAction)
                     .disabled(question.trimmed.isEmpty)
