@@ -1,32 +1,20 @@
 # Screenshot Search Automator
 
-MacOS app that lets you:
-
-1. Trigger a global hotkey.
-2. Drag to select a screen area.
-3. Enter a question in a floating input panel below that area.
-4. Send the screenshot and prompt to an AI API.
-5. Replace the input panel with a floating answer overlay.
-
-The project uses SwiftPM for builds and a small shell script to assemble a signed `.app` bundle without `xcodebuild`.
+macOS menu bar app: press `Cmd+Shift+9`, drag to select any screen area, type a question or tap a numbered quick-prompt button, and get an AI answer in a floating overlay.
 
 ## What is implemented
 
 - SwiftUI + AppKit application shell
 - Global hotkey via Carbon (`Command` + `Shift` + `9`)
-- Full-screen area-selection overlay on every display
+- Full-screen area-selection overlay on every display, with persistent crosshair cursor
 - Screen capture via ScreenCaptureKit for the chosen rectangle
-- Floating prompt panel under the selected area
+- Floating prompt panel under the selected area with numbered quick-prompt buttons (1–4)
+- Quick Prompts settings window accessible from the menu bar icon
 - Floating response panel that replaces the prompt panel
 - Native Claude (Anthropic) and OpenAI API clients with vision support
+- Composite menu bar icon (viewfinder + magnifier SF Symbols)
+- No Xcode required; builds with SwiftPM and a small shell script
 - Manual `.app` bundle build and ad-hoc signing
-
-## What still needs product work
-
-- Custom hotkey configuration UI
-- Better cancellation and escape handling polish
-- Rich response rendering and copy actions
-- Hardened TCC permission and error messaging flows
 
 ## Requirements
 
@@ -77,7 +65,7 @@ The app reads configuration in this priority order:
 
 | Variable | Required | Description |
 |---|---|---|
-| `AI_PROVIDER` | Yes | `claude` or `openai` |
+| `AI_PROVIDER` | Yes | `claude`, `openai`, or `gemini` |
 | `AI_API_KEY` | Yes | Your API key |
 | `AI_MODEL` | No | Model name override (see defaults below) |
 
@@ -87,6 +75,7 @@ The app reads configuration in this priority order:
 |---|---|
 | `claude` | `claude-sonnet-4-5` |
 | `openai` | `gpt-4o-mini` |
+| `gemini` | `gemini-2.5-flash` |
 
 ### Switching provider
 
@@ -97,8 +86,14 @@ AI_PROVIDER="claude" AI_API_KEY="sk-ant-..." ./Scripts/build-app.sh --run
 # OpenAI
 AI_PROVIDER="openai" AI_API_KEY="sk-..." ./Scripts/build-app.sh --run
 
+# Gemini
+AI_PROVIDER="gemini" AI_API_KEY="AIza..." ./Scripts/build-app.sh --run
+
 # Override model
 AI_PROVIDER="claude" AI_API_KEY="sk-ant-..." AI_MODEL="claude-sonnet-4-6" ./Scripts/build-app.sh --run
+
+# Override Gemini model
+AI_PROVIDER="gemini" AI_API_KEY="AIza..." AI_MODEL="gemini-2.5-pro" ./Scripts/build-app.sh --run
 ```
 
 ## API integration
@@ -119,6 +114,10 @@ Uses the [Chat Completions API](https://platform.openai.com/docs/api-reference/c
 Required headers set automatically:
 
 - `Authorization: Bearer <your key>`
+
+### Gemini
+
+Uses the [Gemini generateContent API](https://ai.google.dev/gemini-api/docs/text-generation) with a vision message. The image is sent as inline base64 PNG data and the API key is passed in the request URL.
 
 ### Privacy
 
