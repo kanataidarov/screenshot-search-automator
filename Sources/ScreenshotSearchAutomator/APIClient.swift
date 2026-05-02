@@ -147,13 +147,14 @@ struct APIClient {
     private func sendGemini(question: String, imageData: Data,
                              apiKey: String, model: String) async throws -> String {
         guard let endpoint = URL(string:
-            "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)"
+            "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent"
         ) else {
             throw APIError.transport("Could not construct Gemini endpoint URL.")
         }
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey,             forHTTPHeaderField: "x-goog-api-key")
 
         let body: [String: Any] = [
             "systemInstruction": [
