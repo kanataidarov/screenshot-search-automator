@@ -5,6 +5,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var appState: AppState?
     private var statusItem: NSStatusItem?
     private let quickPromptsSettings = QuickPromptsSettingsController()
+    private let hotKeySettings        = HotKeySettingsController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -27,6 +28,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc
     private func openQuickPromptsSettings() {
         quickPromptsSettings.show()
+    }
+
+    @objc
+    private func openHotKeySettings() {
+        hotKeySettings.show()
     }
 
     @objc
@@ -71,6 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Capture", action: #selector(beginCaptureFlow), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quick Prompts...", action: #selector(openQuickPromptsSettings), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Hotkey...", action: #selector(openHotKeySettings), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quitApplication), keyEquivalent: "q"))
 

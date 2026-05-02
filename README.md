@@ -1,11 +1,11 @@
 # Screenshot Search Automator
 
-macOS menu bar app: press `Cmd+Shift+9`, drag to select any screen area, type a question or tap a numbered quick-prompt button, and get an AI answer in a floating overlay.
+macOS top bar app: press hotkey combination (default `Cmd+Shift+9`), drag to select any screen area, type a question or tap a numbered quick-prompt button, and get an AI answer in a floating overlay.
 
 ## What is implemented
 
 - SwiftUI + AppKit application shell
-- Global hotkey via Carbon (`Command` + `Shift` + `9`)
+- Global hotkey via Carbon (default `Command` + `Shift` + `9`, configurable from menu bar)
 - Full-screen area-selection overlay on every display, with persistent crosshair cursor
 - Screen capture via ScreenCaptureKit for the chosen rectangle
 - Floating prompt panel under the selected area with numbered quick-prompt buttons (1–4)

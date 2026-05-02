@@ -20,7 +20,22 @@ final class AppState {
             }
         }
 
-        try hotKeyCenter.register(keyCode: UInt32(kVK_ANSI_9), modifiers: UInt32(cmdKey | shiftKey))
+        reregisterHotKey()
+
+        NotificationCenter.default.addObserver(
+            forName: .hotKeyDidChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.reregisterHotKey() }
+        }
+    }
+
+    private func reregisterHotKey() {
+        let store = HotKeyStore.shared
+        do {
+            try hotKeyCenter.register(keyCode: store.keyCode, modifiers: store.modifiers)
+        } catch {
+            presentMessage(title: "Hotkey Error", message: error.localizedDescription, isError: true)
+        }
     }
 
     func beginCaptureFlow() {
