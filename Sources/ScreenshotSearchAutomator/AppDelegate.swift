@@ -39,11 +39,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.terminate(nil)
     }
 
+    private func makeStatusBarIcon() -> NSImage? {
+        guard let viewfinder = NSImage(systemSymbolName: "viewfinder", accessibilityDescription: "Screenshot Search"),
+              let magnifier  = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: nil) else {
+            return nil
+        }
+        let size = NSSize(width: 18, height: 18)
+        let composite = NSImage(size: size, flipped: false) { rect in
+            viewfinder.draw(in: rect)
+            let magSize: CGFloat = 8
+            let magRect = NSRect(
+                x: (rect.width  - magSize) / 2,
+                y: (rect.height - magSize) / 2,
+                width: magSize,
+                height: magSize
+            )
+            magnifier.draw(in: magRect)
+            return true
+        }
+        composite.isTemplate = true
+        return composite
+    }
+
     private func setupStatusItem() {
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         let menu = NSMenu()
 
-        statusItem.button?.title = "Shot"
+        if let button = statusItem.button {
+            button.image = makeStatusBarIcon()
+        }
         menu.addItem(NSMenuItem(title: "Capture", action: #selector(beginCaptureFlow), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quick Prompts...", action: #selector(openQuickPromptsSettings), keyEquivalent: ""))
