@@ -60,10 +60,10 @@ The app reads configuration in this priority order:
 
 ### Environment variables
 
-| Variable | Required | Description |
-|---|---|---|
-| `AI_API_KEY` | Yes | Your Gemini API key (`AIza...`) |
-| `AI_MODEL` | No | Model name override (default: `gemini-2.5-flash`) |
+| Variable     | Required | Description                                       |
+|--------------|----------|---------------------------------------------------|
+| `AI_API_KEY` | Yes      | Your Gemini API key (`AIza...`)                   |
+| `AI_MODEL`   | No       | Model name override (default: `gemini-2.5-flash`) |
 
 > **Note:** Google Search Grounding requires a Gemini API key with billing enabled. The free tier supports it only up to a low quota.
 
