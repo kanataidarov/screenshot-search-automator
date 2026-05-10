@@ -86,10 +86,9 @@ cat > "$CONTENTS_DIR/Info.plist" <<EOF
 </plist>
 EOF
 
-if [[ -n "${AI_API_KEY:-}" && -n "${AI_PROVIDER:-}" ]]; then
+if [[ -n "${AI_API_KEY:-}" ]]; then
     cat > "$RESOURCES_DIR/RuntimeConfig.json" <<EOF
 {
-  "provider": "${AI_PROVIDER}",
   "apiKey": "${AI_API_KEY}",
   "model": "${AI_MODEL:-}"
 }

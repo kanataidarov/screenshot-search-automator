@@ -1,28 +1,12 @@
 import Foundation
 
-// MARK: - Provider
-
-enum APIProvider {
-    /// Anthropic Messages API  (claude-* models, https://api.anthropic.com)
-    case claudeMessages(apiKey: String, model: String)
-    /// OpenAI Chat Completions (gpt-4o etc.,  https://api.openai.com)
-    case openAI(apiKey: String, model: String)
-    /// Google Gemini generateContent API  (https://generativelanguage.googleapis.com)
-    case gemini(apiKey: String, model: String)
-}
-
 // MARK: - Client
 
 struct APIClient {
-    let provider: APIProvider?
+    let apiKey: String?
+    let model:  String
 
-    private static let claudeEndpoint    = URL(string: "https://api.anthropic.com/v1/messages")!
-    private static let claudeAPIVersion  = "2023-06-01"
-    private static let openAIEndpoint    = URL(string: "https://api.openai.com/v1/chat/completions")!
-
-    static let defaultClaudeModel  = "claude-sonnet-4-5"
-    static let defaultOpenAIModel  = "gpt-4o-mini"
-    static let defaultGeminiModel  = "gemini-2.5-flash"
+    static let defaultModel = "gemini-2.5-flash"
 
     // Instructs the model to answer only what was asked and not volunteer
     // unrelated details from the screenshot (protects user privacy).
@@ -35,117 +19,22 @@ struct APIClient {
         """
 
     func ask(question: String, imageData: Data) async throws -> String {
-        guard let provider else {
+        guard let apiKey, !apiKey.isEmpty else {
             throw APIError.missingConfiguration(
-                "No AI API configured.\n" +
-                "Set AI_PROVIDER (claude, openai, or gemini) and AI_API_KEY, " +
-                "and optionally AI_MODEL.\n" +
-                "Pass them to the build script to embed them in the app bundle."
+                "No API key configured.\n" +
+                "Set AI_API_KEY and optionally AI_MODEL, then pass them to " +
+                "the build script to embed them in the app bundle."
             )
         }
-        switch provider {
-        case .claudeMessages(let key, let model):
-            return try await sendClaude(question: question, imageData: imageData,
-                                        apiKey: key, model: model)
-        case .openAI(let key, let model):
-            return try await sendOpenAI(question: question, imageData: imageData,
-                                        apiKey: key, model: model)
-        case .gemini(let key, let model):
-            return try await sendGemini(question: question, imageData: imageData,
-                                        apiKey: key, model: model)
-        }
+        return try await sendGeminiWithSearch(
+            question: question, imageData: imageData, apiKey: apiKey, model: model
+        )
     }
 
-    // MARK: Claude (Anthropic Messages API)
+    // MARK: Gemini generateContent API with Google Search Grounding
 
-    private func sendClaude(question: String, imageData: Data,
-                             apiKey: String, model: String) async throws -> String {
-        var request = URLRequest(url: Self.claudeEndpoint)
-        request.httpMethod = "POST"
-        request.setValue("application/json",        forHTTPHeaderField: "Content-Type")
-        request.setValue(apiKey,                    forHTTPHeaderField: "x-api-key")
-        request.setValue(Self.claudeAPIVersion,     forHTTPHeaderField: "anthropic-version")
-
-        let body: [String: Any] = [
-            "model":      model,
-            "max_tokens": 1024,
-            "system":     Self.systemPrompt,
-            "messages": [
-                [
-                    "role": "user",
-                    "content": [
-                        [
-                            "type": "image",
-                            "source": [
-                                "type":       "base64",
-                                "media_type": "image/png",
-                                "data":       imageData.base64EncodedString()
-                            ]
-                        ],
-                        ["type": "text", "text": question]
-                    ]
-                ]
-            ]
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        return try await performRequest(request) { data in
-            guard let root    = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let content = root["content"] as? [[String: Any]] else {
-                throw APIError.transport("Unexpected response structure.")
-            }
-            let text = content
-                .filter { ($0["type"] as? String) == "text" }
-                .compactMap { $0["text"] as? String }
-                .joined(separator: "\n")
-            if text.isEmpty { throw APIError.transport("The model returned no text.") }
-            return text
-        }
-    }
-
-    // MARK: OpenAI Chat Completions
-
-    private func sendOpenAI(question: String, imageData: Data,
-                             apiKey: String, model: String) async throws -> String {
-        var request = URLRequest(url: Self.openAIEndpoint)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)",  forHTTPHeaderField: "Authorization")
-
-        let imageURL = "data:image/png;base64,\(imageData.base64EncodedString())"
-        let body: [String: Any] = [
-            "model":      model,
-            "max_tokens": 1024,
-            "messages": [
-                ["role": "system", "content": Self.systemPrompt],
-                [
-                    "role": "user",
-                    "content": [
-                        ["type": "image_url", "image_url": ["url": imageURL]],
-                        ["type": "text",      "text":      question]
-                    ]
-                ]
-            ]
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        return try await performRequest(request) { data in
-            guard let root    = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let choices = root["choices"] as? [[String: Any]],
-                  let message = choices.first?["message"] as? [String: Any] else {
-                throw APIError.transport("Unexpected response structure.")
-            }
-            if let text = message["content"] as? String, !text.isEmpty { return text }
-            if let parts = message["content"] as? [[String: Any]] {
-                let text = parts.compactMap { $0["text"] as? String }.joined(separator: "\n")
-                if !text.isEmpty { return text }
-            }
-            throw APIError.transport("The model returned no text.")
-        }
-    }
-
-    // MARK: Gemini generateContent API
-
-    private func sendGemini(question: String, imageData: Data,
-                             apiKey: String, model: String) async throws -> String {
+    private func sendGeminiWithSearch(question: String, imageData: Data,
+                                      apiKey: String, model: String) async throws -> String {
         guard let endpoint = URL(string:
             "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent"
         ) else {
@@ -174,19 +63,37 @@ struct APIClient {
                     ]
                 ]
             ],
+            "tools": [["google_search": [:]]],
             "generationConfig": ["maxOutputTokens": 1024]
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         return try await performRequest(request) { data in
             guard let root       = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let candidates = root["candidates"] as? [[String: Any]],
-                  let content    = candidates.first?["content"] as? [String: Any],
+                  let first      = candidates.first,
+                  let content    = first["content"] as? [String: Any],
                   let parts      = content["parts"] as? [[String: Any]] else {
                 throw APIError.transport("Unexpected Gemini response structure.")
             }
             let text = parts.compactMap { $0["text"] as? String }.joined(separator: "\n")
             if text.isEmpty { throw APIError.transport("Gemini returned no text.") }
-            return text
+
+            // Append grounding sources when present
+            let sources = Self.extractSources(from: first)
+            if sources.isEmpty { return text }
+            return text + "\n\nSources:\n" + sources.map { "- \($0)" }.joined(separator: "\n")
+        }
+    }
+
+    // Extracts web source titles/URLs from groundingMetadata.groundingChunks
+    private static func extractSources(from candidate: [String: Any]) -> [String] {
+        guard let meta   = candidate["groundingMetadata"] as? [String: Any],
+              let chunks = meta["groundingChunks"] as? [[String: Any]] else { return [] }
+        return chunks.compactMap { chunk -> String? in
+            guard let web = chunk["web"] as? [String: Any],
+                  let uri = web["uri"] as? String else { return nil }
+            let title = (web["title"] as? String) ?? uri
+            return "\(title) — \(uri)"
         }
     }
 
@@ -209,39 +116,27 @@ struct APIClient {
 // MARK: - Configuration
 
 struct AppConfiguration: Decodable {
-    let provider: String?
-    let apiKey:   String?
-    let model:    String?
+    let apiKey: String?
+    let model:  String?
 
     static func load() -> AppConfiguration {
         let env = ProcessInfo.processInfo.environment
 
-        if let key = env["AI_API_KEY"], !key.isEmpty,
-           let providerRaw = env["AI_PROVIDER"], !providerRaw.isEmpty {
-            return AppConfiguration(provider: providerRaw, apiKey: key, model: env["AI_MODEL"])
+        if let key = env["AI_API_KEY"], !key.isEmpty {
+            return AppConfiguration(apiKey: key, model: env["AI_MODEL"])
         }
 
         guard let cfgURL = Bundle.main.url(forResource: "RuntimeConfig", withExtension: "json"),
               let data   = try? Data(contentsOf: cfgURL),
               let cfg    = try? JSONDecoder().decode(AppConfiguration.self, from: data) else {
-            return AppConfiguration(provider: nil, apiKey: nil, model: nil)
+            return AppConfiguration(apiKey: nil, model: nil)
         }
         return cfg
     }
 
-    func makeProvider() -> APIProvider? {
-        guard let key = apiKey, !key.isEmpty else { return nil }
-        let resolvedModel = model.flatMap { $0.isEmpty ? nil : $0 }
-        switch provider?.lowercased() {
-        case "claude":
-            return .claudeMessages(apiKey: key, model: resolvedModel ?? APIClient.defaultClaudeModel)
-        case "openai":
-            return .openAI(apiKey: key, model: resolvedModel ?? APIClient.defaultOpenAIModel)
-        case "gemini":
-            return .gemini(apiKey: key, model: resolvedModel ?? APIClient.defaultGeminiModel)
-        default:
-            return nil
-        }
+    func makeClient() -> APIClient {
+        let resolvedModel = model.flatMap { $0.isEmpty ? nil : $0 } ?? APIClient.defaultModel
+        return APIClient(apiKey: apiKey, model: resolvedModel)
     }
 }
 

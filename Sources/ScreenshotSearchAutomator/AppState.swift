@@ -6,7 +6,7 @@ import Foundation
 final class AppState {
     private let hotKeyCenter = HotKeyCenter()
     private let captureService = CaptureService()
-    private let apiClient = APIClient(provider: AppConfiguration.load().makeProvider())
+    private let apiClient = AppConfiguration.load().makeClient()
 
     private var selectionOverlay: SelectionOverlayController?
     private var promptPanel: FloatingPanelController?
@@ -180,7 +180,7 @@ final class AppState {
         loadingPanel.show(relativeTo: selection.rect, on: selection.screen) {
             ResponseBubbleView(
                 title: "Thinking",
-                message: "Sending screenshot and prompt to the API...",
+                message: "Searching with Google AI...",
                 isLoading: true,
                 isError: false,
                 onClose: { [weak self] in self?.dismissFloatingPanels() }

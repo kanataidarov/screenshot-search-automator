@@ -11,7 +11,7 @@ macOS top bar app: press hotkey combination (default `Cmd+Shift+9`), drag to sel
 - Floating prompt panel under the selected area with numbered quick-prompt buttons (1–4)
 - Quick Prompts settings window accessible from the menu bar icon
 - Floating response panel that replaces the prompt panel
-- Native Claude (Anthropic) and OpenAI API clients with vision support
+- Gemini API client with vision support and Google Search Grounding (live web search)
 - Composite menu bar icon (viewfinder + magnifier SF Symbols)
 - No Xcode required; builds with SwiftPM and a small shell script
 - Manual `.app` bundle build and ad-hoc signing
@@ -33,24 +33,21 @@ swift build
 Build a runnable `.app` bundle with your API key embedded:
 
 ```bash
-AI_PROVIDER="claude" \
-AI_API_KEY="sk-ant-..." \
+AI_API_KEY="AIza..." \
 ./Scripts/build-app.sh
 ```
 
 Build and immediately launch:
 
 ```bash
-AI_PROVIDER="claude" \
-AI_API_KEY="sk-ant-..." \
+AI_API_KEY="AIza..." \
 ./Scripts/build-app.sh --run
 ```
 
 Use `--release` for an optimised binary:
 
 ```bash
-AI_PROVIDER="claude" \
-AI_API_KEY="sk-ant-..." \
+AI_API_KEY="AIza..." \
 ./Scripts/build-app.sh --release --run
 ```
 
@@ -65,59 +62,24 @@ The app reads configuration in this priority order:
 
 | Variable | Required | Description |
 |---|---|---|
-| `AI_PROVIDER` | Yes | `claude`, `openai`, or `gemini` |
-| `AI_API_KEY` | Yes | Your API key |
-| `AI_MODEL` | No | Model name override (see defaults below) |
+| `AI_API_KEY` | Yes | Your Gemini API key (`AIza...`) |
+| `AI_MODEL` | No | Model name override (default: `gemini-2.5-flash`) |
 
-### Default models
+> **Note:** Google Search Grounding requires a Gemini API key with billing enabled. The free tier supports it only up to a low quota.
 
-| Provider | Default model |
-|---|---|
-| `claude` | `claude-sonnet-4-5` |
-| `openai` | `gpt-4o-mini` |
-| `gemini` | `gemini-2.5-flash` |
-
-### Switching provider
+### Overriding the model
 
 ```bash
-# Claude
-AI_PROVIDER="claude" AI_API_KEY="sk-ant-..." ./Scripts/build-app.sh --run
-
-# OpenAI
-AI_PROVIDER="openai" AI_API_KEY="sk-..." ./Scripts/build-app.sh --run
-
-# Gemini
-AI_PROVIDER="gemini" AI_API_KEY="AIza..." ./Scripts/build-app.sh --run
-
-# Override model
-AI_PROVIDER="claude" AI_API_KEY="sk-ant-..." AI_MODEL="claude-sonnet-4-6" ./Scripts/build-app.sh --run
-
-# Override Gemini model
-AI_PROVIDER="gemini" AI_API_KEY="AIza..." AI_MODEL="gemini-2.5-pro" ./Scripts/build-app.sh --run
+AI_API_KEY="AIza..." AI_MODEL="gemini-2.5-pro" ./Scripts/build-app.sh --run
 ```
 
 ## API integration
 
-### Claude
+### Gemini with Google Search Grounding
 
-Uses the [Anthropic Messages API](https://docs.anthropic.com/en/api/messages) with a vision message. The image is sent as a base64-encoded PNG alongside your question.
+Uses the [Gemini generateContent API](https://ai.google.dev/gemini-api/docs/text-generation) with vision support and the `google_search` tool enabled. Before answering, the model searches Google in real-time, giving it access to up-to-date information. Grounding source URLs are appended to the answer as a plain-text "Sources:" block.
 
-Required headers set automatically:
-
-- `x-api-key: <your key>`
-- `anthropic-version: 2023-06-01`
-
-### OpenAI
-
-Uses the [Chat Completions API](https://platform.openai.com/docs/api-reference/chat) with a vision message (`image_url` content block, `data:image/png;base64,...` format).
-
-Required headers set automatically:
-
-- `Authorization: Bearer <your key>`
-
-### Gemini
-
-Uses the [Gemini generateContent API](https://ai.google.dev/gemini-api/docs/text-generation) with a vision message. The image is sent as inline base64 PNG data and the API key is passed in the request URL.
+The image is sent as inline base64 PNG data. The API key is passed in the `x-goog-api-key` request header.
 
 ### Privacy
 
